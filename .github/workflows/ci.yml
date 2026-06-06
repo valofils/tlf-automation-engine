@@ -1,0 +1,51 @@
+name: TLF Pipeline CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Create venv and install dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: .venv/bin/pytest tests/ -v --tb=short
+
+      - name: Run full pipeline (smoke test)
+        run: .venv/bin/python pipeline.py --output-dir /tmp/tlf_output
+
+      - name: Verify all outputs exist
+        run: |
+          ls /tmp/tlf_output/t14_1_1_demographics.csv
+          ls /tmp/tlf_output/t14_2_1_ae_summary.csv
+          ls /tmp/tlf_output/l16_2_1_ae_listing.csv
+          ls /tmp/tlf_output/fig_14_1_km.png
+          ls /tmp/tlf_output/fig_14_2_lab_change.png
+          ls /tmp/tlf_output/tlf_tables.xlsx
+          ls /tmp/tlf_output/tlf_report_CDISCPILOT01.pdf
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tlf-outputs-py${{ matrix.python-version }}
+          path: /tmp/tlf_output/
